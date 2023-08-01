@@ -1,0 +1,10 @@
+git+https://github.com/huggingface/transformers
+git+https://github.com/huggingface/peft.git@main
+bitsandbytes 
+accelerate 
+loralib
+librosa
+datasets>=2.6.1
+evaluate>=0.30
+jiwer
+tensorboard
