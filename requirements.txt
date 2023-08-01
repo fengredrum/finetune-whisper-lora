@@ -5,6 +5,7 @@ accelerate
 loralib
 librosa
 datasets>=2.6.1
-evaluate>=0.30
+evaluate>=0.3.0
 jiwer
 tensorboard
+soundfile==0.12.0
