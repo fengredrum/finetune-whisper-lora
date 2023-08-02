@@ -11,9 +11,9 @@ from torch.utils.data import DataLoader
 from typing import Any, Dict, List, Union
 from tqdm import tqdm
 
-
-model_name_or_path = "openai/whisper-large-v2"
-language = "ZH"
+metric = evaluate.load("cer")
+model_name_or_path = "openai/whisper-small"
+language = "zh"
 language_abbr = "zh-HK"
 task = "transcribe"
 dataset_name = "common_voice"
@@ -31,7 +31,6 @@ common_voice = common_voice.remove_columns(
 )
 print(common_voice)
 
-metric = evaluate.load("cer")
 feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name_or_path)
 tokenizer = WhisperTokenizer.from_pretrained(
     model_name_or_path, language=language, task=task)
@@ -40,9 +39,13 @@ processor = WhisperProcessor.from_pretrained(
 
 
 model = WhisperForConditionalGeneration.from_pretrained(
-    model_name_or_path, load_in_8bit=True, device_map="auto")
+    model_name_or_path,
+    load_in_8bit=True,
+    device_map="auto")
 model.config.forced_decoder_ids = None
 model.config.suppress_tokens = []
+# silence the warnings. Please re-enable for inference!
+model.config.use_cache = False
 model = prepare_model_for_int8_training(model)
 
 config = LoraConfig(r=32, lora_alpha=64, target_modules=[
@@ -118,26 +121,36 @@ def compute_metrics(pred):
     pred_str = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
     label_str = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
 
-    wer = 100 * metric.compute(predictions=pred_str, references=label_str)
+    cer = 100 * metric.compute(predictions=pred_str, references=label_str)
 
-    return {"wer": wer}
+    return {"cer": cer}
 
 
 training_args = Seq2SeqTrainingArguments(
-    output_dir="temp",  # change to a repo name of your choice
-    per_device_train_batch_size=8,
-    gradient_accumulation_steps=1,  # increase by 2x for every 2x decrease in batch size
-    learning_rate=1e-3,
-    warmup_steps=50,
-    num_train_epochs=3,
-    evaluation_strategy="epoch",
+    output_dir="./whisper-small-cantonese",  # change to a repo name of your choice
+    per_device_train_batch_size=64,
+    gradient_accumulation_steps=2,  # increase by 2x for every 2x decrease in batch size
+    learning_rate=5e-5,
+    warmup_steps=500,
+    max_steps=20000,
+    evaluation_strategy="steps",
+    gradient_checkpointing=True,
+    optim="adamw_torch",
     fp16=True,
     per_device_eval_batch_size=8,
-    generation_max_length=128,
+    generation_max_length=225,
+    save_steps=1000,
+    eval_steps=500,
     logging_steps=25,
+    report_to=["tensorboard"],
+    predict_with_generate=True,
+    # load_best_model_at_end=True,
+    # metric_for_best_model="cer",
+    greater_is_better=False,
     # required as the PeftModel forward doesn't have the signature of the wrapped model's forward
     remove_unused_columns=False,
     label_names=["labels"],  # same reason as above
+    push_to_hub=False,
 )
 
 
@@ -150,13 +163,13 @@ trainer = Seq2SeqTrainer(
     # compute_metrics=compute_metrics,
     tokenizer=processor.feature_extractor,
 )
-# model.config.use_cache = False  # silence the warnings. Please re-enable for inference!
 
-# trainer.train()
+processor.save_pretrained(training_args.output_dir)
+trainer.train()
 
 
 eval_dataloader = DataLoader(
-    common_voice["test"], batch_size=8, collate_fn=data_collator)
+    common_voice["test"], batch_size=32, collate_fn=data_collator)
 
 model.eval()
 for step, batch in enumerate(tqdm(eval_dataloader)):
@@ -183,5 +196,5 @@ for step, batch in enumerate(tqdm(eval_dataloader)):
             )
     del generated_tokens, labels, batch
     gc.collect()
-wer = 100 * metric.compute()
-print(f"{wer=}")
+cer = 100 * metric.compute()
+print(f"{cer=}")
