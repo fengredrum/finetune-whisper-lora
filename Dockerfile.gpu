@@ -1,7 +1,12 @@
 FROM nvidia/cuda:11.7.1-cudnn8-runtime-ubuntu20.04 AS compile-image
+# Environment Setup
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai \
+    PATH=/root/.local/bin:$PATH \
+    PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 # Update and install packages
-RUN apt update && apt upgrade -y && \
-    apt install --no-install-recommends -y gcc gcc-multilib build-essential python3.8 python3-dev python3-pip git tmux && \
+RUN apt update && \
+    apt install --no-install-recommends -y tzdata gcc gcc-multilib build-essential python3.8 python3-dev python3-pip git tmux ffmpeg && \
     apt clean && rm -rf /var/lib/apt/lists/*
 # Install PyTorch
 RUN pip3 install --no-cache-dir --user \
@@ -10,7 +15,4 @@ RUN pip3 install --no-cache-dir --user \
 COPY requirements.txt /
 RUN pip3 install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir --user -r /requirements.txt
-# Make sure scripts in .local are usable:
-ENV TZ=Asia/Shanghai \
-    PATH=/root/.local/bin:$PATH \
-    PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+    
