@@ -3,7 +3,8 @@ import numpy as np
 import evaluate
 import gc
 
-from transformers import WhisperProcessor, WhisperTokenizer, WhisperFeatureExtractor, WhisperForConditionalGeneration
+from transformers import WhisperProcessor, WhisperTokenizer, WhisperForConditionalGeneration
+from peft import PeftModel, PeftConfig
 from datasets import load_dataset, DatasetDict, Audio
 from torch.utils.data import DataLoader
 from dataclasses import dataclass
@@ -11,8 +12,7 @@ from typing import Any, Dict, List, Union
 from tqdm import tqdm
 
 metric = evaluate.load("cer")
-model_name_or_path = "./whisper-small-cantonese/"
-ckpt_path = "checkpoint-1000"
+peft_model_id = "./logs/whisper-small-cantonese/checkpoint-1000"
 language = "zh"
 language_abbr = "zh-HK"
 task = "transcribe"
@@ -20,17 +20,19 @@ dataset_name = "common_voice"
 batch_size = 32
 
 # TODO 8-bit training and inference very slow
+peft_config = PeftConfig.from_pretrained(peft_model_id)
 model = WhisperForConditionalGeneration.from_pretrained(
-    model_name_or_path + ckpt_path,
-    # load_in_8bit=True,
-    device_map="auto")
-model.config.forced_decoder_ids = None
-model.config.suppress_tokens = []
+    peft_config.base_model_name_or_path, load_in_8bit=True, device_map="auto"
+)
+model = PeftModel.from_pretrained(model, peft_model_id)
 tokenizer = WhisperTokenizer.from_pretrained(
-    model_name_or_path, language=language, task=task)
-feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name_or_path)
+    peft_config.base_model_name_or_path, task=task)
 processor = WhisperProcessor.from_pretrained(
-    model_name_or_path, language=language, task=task)
+    peft_config.base_model_name_or_path, task=task)
+feature_extractor = processor.feature_extractor
+model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
+    language=language, task=task)
+# model.config.suppress_tokens = []
 
 common_voice = DatasetDict()
 common_voice["test"] = load_dataset(
