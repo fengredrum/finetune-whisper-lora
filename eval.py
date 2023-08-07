@@ -4,45 +4,48 @@ import evaluate
 import gc
 
 from transformers import WhisperProcessor, WhisperTokenizer, WhisperForConditionalGeneration
-from peft import PeftModel, PeftConfig
-from datasets import load_dataset, DatasetDict, Audio
+from datasets import load_dataset, load_from_disk, DatasetDict, Dataset, Audio
 from torch.utils.data import DataLoader
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 from tqdm import tqdm
 
-metric = evaluate.load("cer")
-peft_model_id = "./logs/whisper-small-cantonese/checkpoint-1000"
-language = "zh"
-language_abbr = "zh-HK"
+# Model setups
+model_name_or_path = "openai/whisper-small"
 task = "transcribe"
-dataset_name = "common_voice"
+metric = evaluate.load("cer")
+language = "zh"
+# Dataset setups
+dataset_name = "mozilla-foundation/common_voice_11_0"
+language_abbr = "zh-HK"
+saved_dir = "./hf_hub/datasets/" + dataset_name + "/" + language_abbr
+num_samples = 200
 batch_size = 32
 
-# TODO 8-bit training and inference very slow
-peft_config = PeftConfig.from_pretrained(peft_model_id)
-model = WhisperForConditionalGeneration.from_pretrained(
-    peft_config.base_model_name_or_path, load_in_8bit=True, device_map="auto"
-)
-model = PeftModel.from_pretrained(model, peft_model_id)
-tokenizer = WhisperTokenizer.from_pretrained(
-    peft_config.base_model_name_or_path, task=task)
-processor = WhisperProcessor.from_pretrained(
-    peft_config.base_model_name_or_path, task=task)
+model = WhisperForConditionalGeneration.from_pretrained(model_name_or_path).to("cuda")
+tokenizer = WhisperTokenizer.from_pretrained(model_name_or_path, task=task)
+processor = WhisperProcessor.from_pretrained(model_name_or_path, task=task)
 feature_extractor = processor.feature_extractor
-model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
-    language=language, task=task)
-# model.config.suppress_tokens = []
+model.config.forced_decoder_ids = None
+model.config.suppress_tokens = []
+model.config.use_cache = False
 
-common_voice = DatasetDict()
-common_voice["test"] = load_dataset(
-    dataset_name, language_abbr, split="test[:100]")
-common_voice = common_voice.remove_columns(
+# Load test dataset
+try:
+    ds = DatasetDict()
+    ds["test"] = load_from_disk(saved_dir)["test"]
+except:
+    print("Download dataset...")
+    ds = DatasetDict()
+    ds["test"] = load_dataset(dataset_name, language_abbr, split="test")
+
+ds = ds.remove_columns(
     ["accent", "age", "client_id", "down_votes",
-        "gender", "locale", "path", "segment", "up_votes"]
+     "gender", "locale", "path", "segment", "up_votes"]
 )
-print(common_voice)
-common_voice = common_voice.cast_column("audio", Audio(sampling_rate=16000))
+ds["test"] = Dataset.from_dict(ds["test"][:num_samples])
+print(ds)
+ds = ds.cast_column("audio", Audio(sampling_rate=16000))
 
 
 def prepare_dataset(batch):
@@ -58,8 +61,8 @@ def prepare_dataset(batch):
     return batch
 
 
-common_voice = common_voice.map(
-    prepare_dataset, remove_columns=common_voice.column_names["test"], num_proc=2)
+ds = ds.map(
+    prepare_dataset, remove_columns=ds.column_names["test"], num_proc=1)
 
 
 @dataclass
@@ -97,31 +100,29 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 
 data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
 eval_dataloader = DataLoader(
-    common_voice["test"], batch_size=batch_size, collate_fn=data_collator)
+    ds["test"], batch_size=batch_size, collate_fn=data_collator)
 
 model.eval()
 for step, batch in enumerate(tqdm(eval_dataloader)):
-    with torch.cuda.amp.autocast():
-        with torch.no_grad():
-            generated_tokens = (
-                model.generate(
-                    input_features=batch["input_features"].to("cuda"),
-                    decoder_input_ids=batch["labels"][:, :4].to("cuda"),
-                    max_new_tokens=255,
-                )
-                .cpu()
-                .numpy()
+    with torch.no_grad():
+        generated_tokens = (
+            model.generate(
+                input_features=batch["input_features"].to("cuda"),
+                return_dict_in_generate=True,
+                max_new_tokens=255,
             )
-            labels = batch["labels"].cpu().numpy()
-            labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-            decoded_preds = tokenizer.batch_decode(
-                generated_tokens, skip_special_tokens=True)
-            decoded_labels = tokenizer.batch_decode(
-                labels, skip_special_tokens=True)
-            metric.add_batch(
-                predictions=decoded_preds,
-                references=decoded_labels,
-            )
+        ).sequences.cpu().numpy()
+      
+        labels = batch["labels"].cpu().numpy()
+        labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+        decoded_preds = tokenizer.batch_decode(
+            generated_tokens, skip_special_tokens=True)
+        decoded_labels = tokenizer.batch_decode(
+            labels, skip_special_tokens=True)
+        metric.add_batch(
+            predictions=decoded_preds,
+            references=decoded_labels,
+        )
     del generated_tokens, labels, batch
     gc.collect()
 cer = 100 * metric.compute()
