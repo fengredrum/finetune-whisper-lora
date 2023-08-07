@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Union
 from tqdm import tqdm
 
 # Model setups
-peft_model_id = "alvanlii/whisper-largev2-cantonese-peft-lora"
+peft_model_id = "./logs/whisper-large-lora-cantonese/checkpoint-1200"
 task = "transcribe"
 metric = evaluate.load("cer")
 language = "zh"
