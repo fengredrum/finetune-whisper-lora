@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
 metric = evaluate.load("cer")
-experiment_name = "whisper-small-cantonese"
-model_name_or_path = "openai/whisper-small"
+experiment_name = "whisper-large-lora-cantonese"
+model_name_or_path = "openai/whisper-large-v2"
 language = "zh"
 language_abbr = "zh-HK"
 task = "transcribe"
@@ -50,7 +50,7 @@ def prepare_dataset(batch):
 
 
 common_voice = common_voice.map(
-    prepare_dataset, remove_columns=common_voice.column_names["train"], num_proc=2)
+    prepare_dataset, remove_columns=common_voice.column_names["train"], num_proc=1)
 
 
 @dataclass
@@ -89,22 +89,6 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
 
 
-def compute_metrics(pred):
-    pred_ids = pred.predictions
-    label_ids = pred.label_ids
-
-    # replace -100 with the pad_token_id
-    label_ids[label_ids == -100] = tokenizer.pad_token_id
-
-    # we do not want to group tokens when computing the metrics
-    pred_str = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
-    label_str = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
-
-    cer = 100 * metric.compute(predictions=pred_str, references=label_str)
-
-    return {"cer": cer}
-
-
 # TODO 8-bit training and inference very slow
 model = WhisperForConditionalGeneration.from_pretrained(
     model_name_or_path,
@@ -121,14 +105,14 @@ model.print_trainable_parameters()
 
 training_args = Seq2SeqTrainingArguments(
     output_dir="./logs/" + experiment_name,  # change to a repo name of your choice
-    per_device_train_batch_size=64,
+    per_device_train_batch_size=32,
     gradient_accumulation_steps=1,  # increase by 2x for every 2x decrease in batch size
     learning_rate=1e-3,
     warmup_steps=500,
     num_train_epochs=5,
     evaluation_strategy="steps",
     # gradient_checkpointing=True,
-    optim="adamw_torch",
+    # optim="adamw_torch",
     fp16=True,
     per_device_eval_batch_size=8,
     generation_max_length=225,
