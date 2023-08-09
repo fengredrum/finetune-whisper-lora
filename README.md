@@ -11,4 +11,4 @@ rm cantonese_dataset.zip
 | Model name                   | CER % |
 | ---------------------------- | ----- |
 | whisper-small-cantonese      | 25    |
-| whisper-large-lora-cantonese | 9     |
+| whisper-large-lora-cantonese | 15.19 |
