@@ -15,4 +15,4 @@ rm cantonese_dataset.zip
 | Model name                   | Steps | Training Loss | Validation Loss | CER % |
 | ---------------------------- | ----- | ------------- | --------------- | ----- |
 | whisper-small-cantonese      | 3600  | 0.0266        | 0.137           | 6.16  |
-| whisper-large-lora-cantonese | 120   | 0.0501        | 0.178           | 15.19 |
+| whisper-large-lora-cantonese | 1200  | 0.0501        | 0.178           | 15.19 |
