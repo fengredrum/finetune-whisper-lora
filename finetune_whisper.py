@@ -37,6 +37,7 @@ ds = ds.remove_columns(
 ds["test"] = Dataset.from_dict(ds["test"][:num_test_samples])
 print(ds)
 ds = ds.cast_column("audio", Audio(sampling_rate=16000))
+print(ds["train"][0])
 
 feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name_or_path)
 tokenizer = WhisperTokenizer.from_pretrained(
@@ -114,21 +115,20 @@ def compute_metrics(pred):
     return {"cer": cer}
 
 
-model = WhisperForConditionalGeneration.from_pretrained(
-    model_name_or_path, device_map="auto")
+model = WhisperForConditionalGeneration.from_pretrained(model_name_or_path)
 model.config.forced_decoder_ids = None
 model.config.suppress_tokens = []
 
 training_args = Seq2SeqTrainingArguments(
     output_dir="./logs/" + experiment_name,  # change to a repo name of your choice
     per_device_train_batch_size=32,
-    gradient_accumulation_steps=1,  # increase by 2x for every 2x decrease in batch size
+    gradient_accumulation_steps=2,  # increase by 2x for every 2x decrease in batch size
     learning_rate=1e-5,
     warmup_steps=500,
     num_train_epochs=5,
     gradient_checkpointing=True,
     evaluation_strategy="steps",
-    optim="adamw_torch",
+    # optim="adamw_torch",
     fp16=True,
     per_device_eval_batch_size=8,
     predict_with_generate=True,
@@ -155,5 +155,5 @@ trainer = Seq2SeqTrainer(
 
 processor.save_pretrained(training_args.output_dir)
 # silence the warnings. Please re-enable for inference!
-model.config.use_cache = False
+# model.config.use_cache = False
 trainer.train()
