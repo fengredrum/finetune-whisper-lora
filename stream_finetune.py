@@ -110,9 +110,9 @@ def compute_metrics(pred):
     pred_str = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
     label_str = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
 
-    wer = 100 * metric.compute(predictions=pred_str, references=label_str)
+    cer = 100 * metric.compute(predictions=pred_str, references=label_str)
 
-    return {"wer": wer}
+    return {"cer": cer}
 
 
 @dataclass
