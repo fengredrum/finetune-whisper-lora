@@ -162,4 +162,5 @@ cython_debug/
 # Other
 hf_hub/
 cache/
+datasets/
 test.py
