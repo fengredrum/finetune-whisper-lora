@@ -17,4 +17,5 @@ rm cantonese_dataset.zip
 | whisper-tiny-cantonese       | 39 M       | 4400  | 0.0135        | 0.209           | 9.72  |
 | whisper-base-cantonese       | 74 M       | 2400  | 0.0407        | 0.156           | 8.48  |
 | whisper-small-cantonese      | 244 M      | 3600  | 0.0266        | 0.137           | 6.16  |
+| whisper-small-lora-cantonese | 3.5 M      | 7600  | 0.0349        | 0.157           | 7.39  |
 | whisper-large-lora-cantonese |            | 1200  | 0.0501        | 0.178           | 15.19 |
