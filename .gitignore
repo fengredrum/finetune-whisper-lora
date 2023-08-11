@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 
 # Other
+.vscode/
 hf_hub/
 cache/
 logs/
