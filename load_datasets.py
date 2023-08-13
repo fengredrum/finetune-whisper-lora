@@ -15,7 +15,7 @@ def load_mdcc(dataset_root, sampling_rate=16000, use_valid_to_train=True):
     ds_keys = ["train", "valid", "test"]
     for key in ds_keys:
         filelist = dataset_dir + f"cnt_asr_{key}_metadata.csv"
-        filepaths_and_text = load_filepaths_and_text(filelist)[:100]
+        filepaths_and_text = load_filepaths_and_text(filelist)
         filepaths_and_text[0].append("transcription")
         audio_paths, transcription_texts = [], []
 
