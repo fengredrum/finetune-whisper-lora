@@ -20,8 +20,8 @@ rm cantonese_dataset.zip
 
 | Model name                      | Parameters | Finetune Steps | Time Spend | Training Loss | Validation Loss | CER % |
 | ------------------------------- | ---------- | -------------- | ---------- | ------------- | --------------- | ----- |
-| whisper-tiny-cantonese          | 39 M       | 4400           | 6h 29m     | 0.0135        | 0.209           | 9.72  |
-| whisper-base-cantonese          | 74 M       | 2400           | 3h 12m     | 0.0407        | 0.156           | 8.48  |
+| whisper-tiny-cantonese          | 39 M       | 4400           | 6h 29m     | 0.0135        | 0.209           | 11.04 |
+| whisper-base-cantonese          | 74 M       | 2400           | 3h 12m     | 0.0407        | 0.156           | 7.24  |
 | whisper-small-cantonese         | 244 M      | 3600           | 6h 38m     | 0.0266        | 0.137           | 6.16  |
 | whisper-large-v2-lora-cantonese | 15 M       | 2000           | 11h 32m    | 0.0408        | 0.093           | 4.58  |
 
@@ -29,7 +29,7 @@ rm cantonese_dataset.zip
 
 | Model name                      | Original CER % | w/o Finetune CER % | Jointly Finetune CER % |
 | ------------------------------- | -------------- | ------------------ | ---------------------- |
-| whisper-tiny-cantonese          | 124.03         | 66.85              |                        |
-| whisper-base-cantonese          | 78.24          | 61.42              |                        |
-| whisper-small-cantonese         | 52.83          | 31.23              |                        |
-| whisper-large-v2-lora-cantonese | 37.53          | 19.38              |                        |
+| whisper-tiny-cantonese          | 124.03         | 66.85              | 36.70                  |
+| whisper-base-cantonese          | 78.24          | 61.42              | 16.33                  |
+| whisper-small-cantonese         | 52.83          | 31.23              | /                      |
+| whisper-large-v2-lora-cantonese | 37.53          | 19.38              | /                      |
