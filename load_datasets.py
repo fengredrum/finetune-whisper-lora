@@ -8,11 +8,14 @@ def load_filepaths_and_text(filename, split=","):
     return filepaths_and_text
 
 
-def load_mdcc(dataset_root, sampling_rate=16000, use_valid_to_train=True):
+def load_mdcc(dataset_root, sampling_rate=16000, use_valid_to_train=True, test_only=False):
     ds = IterableDatasetDict()
 
     dataset_dir = dataset_root + "mdcc/"
-    ds_keys = ["train", "valid", "test"]
+    if test_only:
+        ds_keys = ["test"]
+    else:
+        ds_keys = ["train", "valid", "test"]
     for key in ds_keys:
         filelist = dataset_dir + f"cnt_asr_{key}_metadata.csv"
         filepaths_and_text = load_filepaths_and_text(filelist)
@@ -36,14 +39,14 @@ def load_mdcc(dataset_root, sampling_rate=16000, use_valid_to_train=True):
         ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
                                streaming=True, features=ds_tmp.features)
 
-    if use_valid_to_train:
+    if use_valid_to_train and not test_only:
         ds["train"] = concatenate_datasets([ds["train"], ds["valid"]])
 
     ds = ds.cast_column("audio", Audio(sampling_rate=sampling_rate))
     return ds
 
 
-def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, use_valid_to_train=True):
+def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, use_valid_to_train=True, test_only=False):
     dataset_name = "mozilla-foundation/common_voice_11_0"
     ds = IterableDatasetDict()
 
@@ -65,7 +68,7 @@ def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, use_valid_to_t
     return ds
 
 
-def load_process_datasets(datasets_name, processor, dataset_root="./datasets/", num_test_samples=1000,
+def load_process_datasets(datasets_name, processor, dataset_root="./datasets/", test_only=False, num_test_samples=1000,
                           sampling_rate=16000, max_input_length=30.0, buffer_size=500, seed=42):
 
     def prepare_dataset(batch):
@@ -93,24 +96,28 @@ def load_process_datasets(datasets_name, processor, dataset_root="./datasets/", 
     for name in datasets_name:
         ds_tmp = None
         if name == "mdcc":
-            ds_tmp = load_mdcc(dataset_root, sampling_rate=sampling_rate)
-            print("mdcc: ", next(iter(ds_tmp["train"])))
+            ds_tmp = load_mdcc(
+                dataset_root, sampling_rate=sampling_rate, test_only=test_only)
+            print("mdcc: ", next(iter(ds_tmp["test"])))
         elif name == "common_voice":
             ds_tmp = load_common_voice(
-                language_abbr="zh-HK", sampling_rate=sampling_rate)
-            print("common_voice: ", next(iter(ds_tmp["train"])))
+                language_abbr="zh-HK", sampling_rate=sampling_rate, test_only=test_only)
+            print("common_voice: ", next(iter(ds_tmp["test"])))
 
         if ds_tmp is not None:
-            train_list.append(ds_tmp["train"])
             test_list.append(ds_tmp["test"])
+            if not test_only:
+                train_list.append(ds_tmp["train"])
 
-    ds["train"] = concatenate_datasets(train_list)
     ds["test"] = concatenate_datasets(test_list)
-    ds = ds.map(prepare_dataset, remove_columns=list(
-        next(iter(ds.values())).features)).with_format("torch")
+    if not test_only:
+        ds["train"] = concatenate_datasets(train_list)
+    ds = ds.map(prepare_dataset,
+                # remove_columns=list(next(iter(ds.values())).features),
+                ).with_format("torch")
 
     ds = ds.filter(
         is_audio_in_length_range, input_columns=["input_length"])
-    ds["test"] = ds["test"].take(num_test_samples)
     ds = ds.shuffle(seed, buffer_size=buffer_size)
+    ds["test"] = ds["test"].take(num_test_samples)
     return ds
