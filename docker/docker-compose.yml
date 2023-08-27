@@ -20,5 +20,5 @@ services:
               capabilities: [gpu]
     working_dir: /app
     volumes:
-      - ./:/app
+      - ../:/app
     command: bash
