@@ -46,6 +46,8 @@ python eval.py
 
 ## Approximate Performance Evaluation
 
+The following models are all trained and evaluated on a single RTX 3090 GPU.
+
 ### Cantonese Test Results Comparison
 
 #### MDCC
@@ -53,7 +55,7 @@ python eval.py
 | Model name                      | Parameters | Finetune Steps | Time Spend | Training Loss | Validation Loss | CER % |
 | ------------------------------- | ---------- | -------------- | ---------- | ------------- | --------------- | ----- |
 | whisper-tiny-cantonese          | 39 M       | 3200           | 4h 34m     | 0.0485        | 0.771           | 11.10 |
-| whisper-base-cantonese          | 74 M       | 2400           | 3h 12m     | 0.0407        | 0.156           | 7.24  |
+| whisper-base-cantonese          | 74 M       | 7200           | 13h 32m    | 0.0186        | 0.477           | 7.66  |
 | whisper-small-cantonese         | 244 M      | 3600           | 6h 38m     | 0.0266        | 0.137           | 6.16  |
 | whisper-large-v2-lora-cantonese | 15 M       | 2000           | 11h 32m    | 0.0408        | 0.093           | 4.58  |
 
@@ -62,7 +64,7 @@ python eval.py
 | Model name                      | Original CER % | w/o Finetune CER % | Jointly Finetune CER % |
 | ------------------------------- | -------------- | ------------------ | ---------------------- |
 | whisper-tiny-cantonese          | 124.03         | 66.85              | 35.87                  |
-| whisper-base-cantonese          | 78.24          | 61.42              | 16.33                  |
+| whisper-base-cantonese          | 78.24          | 61.42              | 16.73                  |
 | whisper-small-cantonese         | 52.83          | 31.23              | /                      |
 | whisper-large-v2-lora-cantonese | 37.53          | 19.38              | /                      |
 
