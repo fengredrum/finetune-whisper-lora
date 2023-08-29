@@ -5,23 +5,25 @@ import gc
 
 from transformers import WhisperProcessor, WhisperTokenizer, WhisperForConditionalGeneration
 from peft import PeftModel, PeftConfig
-from datasets import load_dataset, load_from_disk, DatasetDict, Dataset, Audio
 from torch.utils.data import DataLoader
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 from tqdm import tqdm
+from load_datasets import load_process_datasets
 
 # Model setups
-peft_model_id = "./logs/whisper-large-lora-cantonese/checkpoint-1200"
+peft_model_id = "Oblivion208/whisper-large-v2-lora-cantonese"
 task = "transcribe"
 metric = evaluate.load("cer")
 language = "zh"
 # Dataset setups
-dataset_name = "mozilla-foundation/common_voice_11_0"
-language_abbr = "zh-HK"
-saved_dir = "./hf_hub/datasets/" + dataset_name + "/" + language_abbr
-num_samples = 1000
-batch_size = 32
+datasets_name = [
+    "mdcc",
+    "common_voice",
+]
+max_input_length = 30.0
+num_test_samples = 5000
+batch_size = 64
 
 # TODO 8-bit training and inference very slow
 peft_config = PeftConfig.from_pretrained(peft_model_id)
@@ -37,39 +39,14 @@ model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
     language=language, task=task)
 # model.config.suppress_tokens = []
 
-# Load test dataset
-try:
-    ds = DatasetDict()
-    ds["test"] = load_from_disk(saved_dir)["test"]
-except:
-    print("Download dataset...")
-    ds = DatasetDict()
-    ds["test"] = load_dataset(dataset_name, language_abbr, split="test")
-
-ds = ds.remove_columns(
-    ["accent", "age", "client_id", "down_votes",
-     "gender", "locale", "path", "segment", "up_votes"]
+ds = load_process_datasets(
+    datasets_name,
+    processor,
+    max_input_length=max_input_length,
+    num_test_samples=num_test_samples,
+    test_only=True,
 )
-ds["test"] = Dataset.from_dict(ds["test"][:num_samples])
-print(ds)
-ds = ds.cast_column("audio", Audio(sampling_rate=16000))
-
-
-def prepare_dataset(batch):
-    # load and resample audio data from 48 to 16kHz
-    audio = batch["audio"]
-
-    # compute log-Mel input features from input audio array
-    batch["input_features"] = feature_extractor(
-        audio["array"], sampling_rate=audio["sampling_rate"]).input_features[0]
-
-    # encode target text to label ids
-    batch["labels"] = tokenizer(batch["sentence"]).input_ids
-    return batch
-
-
-ds = ds.map(
-    prepare_dataset, remove_columns=ds.column_names["test"], num_proc=1)
+print("test sample: ", next(iter(ds["test"])))
 
 
 @dataclass
@@ -108,6 +85,8 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
 eval_dataloader = DataLoader(
     ds["test"], batch_size=batch_size, collate_fn=data_collator)
+forced_decoder_ids = processor.get_decoder_prompt_ids(
+    language=language, task=task)
 
 model.eval()
 for step, batch in enumerate(tqdm(eval_dataloader)):
@@ -116,11 +95,9 @@ for step, batch in enumerate(tqdm(eval_dataloader)):
             generated_tokens = (
                 model.generate(
                     input_features=batch["input_features"].to("cuda"),
-                    decoder_input_ids=batch["labels"][:, :4].to("cuda"),
+                    forced_decoder_ids=forced_decoder_ids,
                     max_new_tokens=255,
-                )
-                .cpu()
-                .numpy()
+                ).cpu().numpy()
             )
             labels = batch["labels"].cpu().numpy()
             labels = np.where(labels != -100, labels, tokenizer.pad_token_id)

@@ -4,65 +4,43 @@ import evaluate
 import gc
 
 from transformers import WhisperProcessor, WhisperTokenizer, WhisperForConditionalGeneration
-from datasets import load_dataset, load_from_disk, DatasetDict, Dataset, Audio
 from torch.utils.data import DataLoader
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 from tqdm import tqdm
+from load_datasets import load_process_datasets
 
 # Model setups
-model_name_or_path = "openai/whisper-small"
+model_name_or_path = "Oblivion208/whisper-tiny-cantonese"
 task = "transcribe"
 metric = evaluate.load("cer")
 language = "zh"
 # Dataset setups
-dataset_name = "mozilla-foundation/common_voice_11_0"
-language_abbr = "zh-HK"
-saved_dir = "./hf_hub/datasets/" + dataset_name + "/" + language_abbr
-num_samples = 200
-batch_size = 32
+datasets_name = [
+    "mdcc",
+    "common_voice",
+]
+max_input_length = 30.0
+num_test_samples = 5000
+batch_size = 64
 
-model = WhisperForConditionalGeneration.from_pretrained(model_name_or_path).to("cuda")
+model = WhisperForConditionalGeneration.from_pretrained(
+    model_name_or_path).to("cuda")
 tokenizer = WhisperTokenizer.from_pretrained(model_name_or_path, task=task)
 processor = WhisperProcessor.from_pretrained(model_name_or_path, task=task)
 feature_extractor = processor.feature_extractor
 model.config.forced_decoder_ids = None
 model.config.suppress_tokens = []
-model.config.use_cache = False
+# model.config.use_cache = False
 
-# Load test dataset
-try:
-    ds = DatasetDict()
-    ds["test"] = load_from_disk(saved_dir)["test"]
-except:
-    print("Download dataset...")
-    ds = DatasetDict()
-    ds["test"] = load_dataset(dataset_name, language_abbr, split="test")
-
-ds = ds.remove_columns(
-    ["accent", "age", "client_id", "down_votes",
-     "gender", "locale", "path", "segment", "up_votes"]
+ds = load_process_datasets(
+    datasets_name,
+    processor,
+    max_input_length=max_input_length,
+    num_test_samples=num_test_samples,
+    test_only=True,
 )
-ds["test"] = Dataset.from_dict(ds["test"][:num_samples])
-print(ds)
-ds = ds.cast_column("audio", Audio(sampling_rate=16000))
-
-
-def prepare_dataset(batch):
-    # load and resample audio data from 48 to 16kHz
-    audio = batch["audio"]
-
-    # compute log-Mel input features from input audio array
-    batch["input_features"] = feature_extractor(
-        audio["array"], sampling_rate=audio["sampling_rate"]).input_features[0]
-
-    # encode target text to label ids
-    batch["labels"] = tokenizer(batch["sentence"]).input_ids
-    return batch
-
-
-ds = ds.map(
-    prepare_dataset, remove_columns=ds.column_names["test"], num_proc=1)
+print("test sample: ", next(iter(ds["test"])))
 
 
 @dataclass
@@ -112,7 +90,7 @@ for step, batch in enumerate(tqdm(eval_dataloader)):
                 max_new_tokens=255,
             )
         ).sequences.cpu().numpy()
-      
+
         labels = batch["labels"].cpu().numpy()
         labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
         decoded_preds = tokenizer.batch_decode(
