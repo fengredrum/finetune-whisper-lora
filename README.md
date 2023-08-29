@@ -1,4 +1,4 @@
-# Finetune-Whisper-Lora
+# Finetune-Whisper-LoRA
 
 ## Get Started
 
@@ -35,13 +35,21 @@ rm cantonese_dataset.zip
 ### 3. Finetune Pretrained Model
 
 ```bash
-python finetune.py
+python finetune.py # Finetuning
+```
+
+```bash
+python finetune_lora.py # LoRA Finetuning
 ```
 
 ### 4. Evaluate Performance
 
 ```bash
-python eval.py
+python eval.py # Evaluation
+```
+
+```bash
+python eval_lora.py # LoRA Evaluation
 ```
 
 ## Approximate Performance Evaluation
