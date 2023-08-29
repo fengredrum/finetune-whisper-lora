@@ -15,4 +15,3 @@ RUN pip3 install --no-cache-dir --user \
 COPY requirements.txt /
 RUN pip3 install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir --user -r /requirements.txt
-    
