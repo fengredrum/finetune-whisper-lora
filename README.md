@@ -60,13 +60,13 @@ The following models are all trained and evaluated on a single RTX 3090 GPU.
 
 #### MDCC
 
-| Model name                      | Parameters | Finetune Steps | Time Spend | Training Loss | Validation Loss | CER %  | Finetuned Model                                                                                                          |
-| ------------------------------- | ---------- | -------------- | ---------- | ------------- | --------------- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
-| whisper-tiny-cantonese          | 39 M       | 3200           | 4h 34m     | 0.0485        | 0.771           | 11.10  | [Link](https://huggingface.co/Oblivion208/whisper-tiny-cantonese "Oblivion208/whisper-tiny-cantonese")                   |
-| whisper-base-cantonese          | 74 M       | 7200           | 13h 32m    | 0.0186        | 0.477           | 7.66   | [Link](https://huggingface.co/Oblivion208/whisper-base-cantonese "Oblivion208/whisper-base-cantonese")                   |
-| whisper-small-cantonese         | 244 M      | 3600           | 6h 38m     | 0.0266        | 0.137           | 6.16   | [Link](https://huggingface.co/Oblivion208/whisper-small-cantonese "Oblivion208/whisper-small-cantonese")                 |
-| whisper-small-lora-cantonese    | 3.5 M      | 8000           | 21h 27m    | 0.0687        | 0.382           | 7.40   | [Link](https://huggingface.co/Oblivion208/whisper-small-lora-cantonese "Oblivion208/whisper-small-lora-cantonese")       |
-| whisper-large-v2-lora-cantonese | 15 M       | 10000          | 33h 40m    | 0.0046        | 0.277           | 3.89\* | [Link](https://huggingface.co/Oblivion208/whisper-large-v2-lora-cantonese "Oblivion208/whisper-large-v2-lora-cantonese") |
+| Model name                      | Parameters | Finetune Steps | Time Spend | Training Loss | Validation Loss | CER % | Finetuned Model                                                                                                          |
+| ------------------------------- | ---------- | -------------- | ---------- | ------------- | --------------- | ----- | ------------------------------------------------------------------------------------------------------------------------ |
+| whisper-tiny-cantonese          | 39 M       | 3200           | 4h 34m     | 0.0485        | 0.771           | 11.10 | [Link](https://huggingface.co/Oblivion208/whisper-tiny-cantonese "Oblivion208/whisper-tiny-cantonese")                   |
+| whisper-base-cantonese          | 74 M       | 7200           | 13h 32m    | 0.0186        | 0.477           | 7.66  | [Link](https://huggingface.co/Oblivion208/whisper-base-cantonese "Oblivion208/whisper-base-cantonese")                   |
+| whisper-small-cantonese         | 244 M      | 3600           | 6h 38m     | 0.0266        | 0.137           | 6.16  | [Link](https://huggingface.co/Oblivion208/whisper-small-cantonese "Oblivion208/whisper-small-cantonese")                 |
+| whisper-small-lora-cantonese    | 3.5 M      | 8000           | 21h 27m    | 0.0687        | 0.382           | 7.40  | [Link](https://huggingface.co/Oblivion208/whisper-small-lora-cantonese "Oblivion208/whisper-small-lora-cantonese")       |
+| whisper-large-v2-lora-cantonese | 15 M       | 10000          | 33h 40m    | 0.0046        | 0.277           | 3.77  | [Link](https://huggingface.co/Oblivion208/whisper-large-v2-lora-cantonese "Oblivion208/whisper-large-v2-lora-cantonese") |
 
 #### Common Voice Corpus 11.0
 
