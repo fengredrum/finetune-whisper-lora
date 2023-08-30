@@ -1,5 +1,9 @@
 # Finetune-Whisper-LoRA
 
+<p align="left">
+🤗 <a href="https://huggingface.co/Oblivion208" target="_blank">HF Repo</a>  •🐱 <a href="https://github.com/fengredrum/finetune-whisper-lora" target="_blank">Github Repo</a> 
+</p>
+
 ## Get Started
 
 ### 1. Setup Docker Environment
@@ -89,6 +93,7 @@ The following models are all trained and evaluated on a single RTX 3090 GPU.
 
 ## References
 
-1. https://huggingface.co/blog/fine-tune-whisper
-2. https://huggingface.co/docs/peft/task_guides/int8-asr
-3. https://huggingface.co/alvanlii/whisper-largev2-cantonese-peft-lora
+1. https://github.com/openai/whisper
+2. https://huggingface.co/blog/fine-tune-whisper
+3. https://huggingface.co/docs/peft/task_guides/int8-asr
+4. https://huggingface.co/alvanlii/whisper-largev2-cantonese-peft-lora
