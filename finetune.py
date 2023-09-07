@@ -16,7 +16,13 @@ task = "transcribe"
 metric = evaluate.load("cer")
 language = "zh"
 # Dataset setups
-datasets_name = ["mdcc", "common_voice"]
+datasets_settings = [
+    ["mdcc", {}],
+    ["common_voice", {"language_abbr": "zh-HK"}],
+    ["aishell_1", {}],
+    ["thchs_30", {}],
+    ["magicdata", {}],
+]
 max_input_length = 30.0
 num_test_samples = 1000
 
@@ -28,7 +34,7 @@ processor = WhisperProcessor.from_pretrained(
     model_name_or_path, language=language, task=task)
 
 ds = load_process_datasets(
-    datasets_name,
+    datasets_settings,
     processor,
     max_input_length=max_input_length,
     num_test_samples=num_test_samples,
@@ -95,7 +101,7 @@ model.config.suppress_tokens = []
 
 training_args = Seq2SeqTrainingArguments(
     output_dir="./logs/" + experiment_name,  # change to a repo name of your choice
-    per_device_train_batch_size=28,
+    per_device_train_batch_size=32,
     gradient_accumulation_steps=2,  # increase by 2x for every 2x decrease in batch size
     learning_rate=5e-5,
     warmup_steps=500,
@@ -104,7 +110,7 @@ training_args = Seq2SeqTrainingArguments(
     evaluation_strategy="steps",
     optim="adamw_torch",
     fp16=True,
-    per_device_eval_batch_size=8,
+    per_device_eval_batch_size=16,
     predict_with_generate=True,
     generation_max_length=225,
     save_steps=1000,

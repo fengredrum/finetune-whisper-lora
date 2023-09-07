@@ -1,3 +1,5 @@
+import os
+
 from datasets import load_dataset, concatenate_datasets, IterableDatasetDict, Dataset, Audio
 from tqdm import tqdm
 
@@ -6,6 +8,140 @@ def load_filepaths_and_text(filename, split=","):
     with open(filename, encoding='utf-8') as f:
         filepaths_and_text = [line.strip().split(split) for line in f]
     return filepaths_and_text
+
+
+def load_magicdata(dataset_root, sampling_rate=16000, use_valid_to_train=False, test_only=False):
+    ds = IterableDatasetDict()
+
+    if test_only:
+        ds_keys = ["test"]
+    else:
+        ds_keys = ["train", "dev", "test"]
+
+    audio_paths, transcription_texts = {}, {}
+    for key in ds_keys:
+        dataset_dir = dataset_root + "magicdata/" + key + "/"
+        if os.path.exists(dataset_dir):
+            filepaths_and_text = load_filepaths_and_text(
+                dataset_dir + "TRANS.txt", split="\t")
+            audio_paths[key], transcription_texts[key] = [], []
+            for filename, subdir, text in filepaths_and_text[1:]:
+                audio_paths[key].append(dataset_dir + subdir + "/" + filename)
+                transcription_texts[key].append(text)
+
+            dataset_dict = {
+                "audio": audio_paths[key], "sentence": transcription_texts[key]}
+            ds_tmp = Dataset.from_dict(dataset_dict)
+            ds_tmp.to_json(dataset_dir + f"{key}.json", index=False)
+
+            ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
+                                   streaming=True, features=ds_tmp.features)
+
+    if use_valid_to_train and not test_only:
+        ds["train"] = concatenate_datasets([ds["train"], ds["dev"]])
+
+    ds = ds.cast_column("audio", Audio(sampling_rate=sampling_rate))
+    return ds
+
+
+def load_thchs_30(dataset_root, sampling_rate=16000, use_valid_to_train=False, test_only=False):
+    ds = IterableDatasetDict()
+
+    dataset_dir = dataset_root + "thchs_30/data_thchs30/"
+    if test_only:
+        ds_keys = ["test"]
+    else:
+        ds_keys = ["train", "dev", "test"]
+
+    def load_transcripts(filename):
+        with open(filename, encoding='utf-8') as f:
+            texts = [line.strip() for line in f]
+        return texts[0].replace(" ", "")
+
+    audio_paths, transcription_texts = {}, {}
+    list_dirs = os.walk(dataset_dir)
+    for root, dirs, files in list_dirs:
+        subset_name = root.split("/")[-1]
+        if subset_name in ds_keys:
+            audio_paths[subset_name] = [dataset_dir + subset_name + "/" +
+                                        file for file in files if "wav" in file and "trn" not in file]
+            transcription_texts[subset_name] = [load_transcripts(audio_path.replace(
+                subset_name, "data") + ".trn") for audio_path in audio_paths[subset_name]]
+
+    for key in ds_keys:
+        dataset_dict = {
+            "audio": audio_paths[key], "sentence": transcription_texts[key]}
+        ds_tmp = Dataset.from_dict(dataset_dict)
+        ds_tmp.to_json(dataset_dir + f"{key}.json", index=False)
+
+        ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
+                               streaming=True, features=ds_tmp.features)
+
+    if use_valid_to_train and not test_only:
+        ds["train"] = concatenate_datasets([ds["train"], ds["dev"]])
+
+    ds = ds.cast_column("audio", Audio(sampling_rate=sampling_rate))
+
+    return ds
+
+
+def load_aishell_1(dataset_root, sampling_rate=16000, use_valid_to_train=False, test_only=False):
+    ds = IterableDatasetDict()
+
+    dataset_dir = dataset_root + "aishell_1/data_aishell/"
+    if test_only:
+        ds_keys = ["test"]
+    else:
+        ds_keys = ["train", "dev", "test"]
+
+    def load_transcripts(filename, split=" ", maxsplit=1):
+        with open(filename, encoding='utf-8') as f:
+            filename_and_texts = [line.strip().split(
+                split, maxsplit=maxsplit) for line in f]
+        return filename_and_texts
+
+    filelist = dataset_dir + "transcript/aishell_transcript_v0.8.txt"
+    filename_and_texts = load_transcripts(filelist)
+    dirpaths = []
+    list_dirs = os.walk(dataset_dir)
+    for root, dirs, files in list_dirs:
+        if "S" in root:
+            dirpaths.append(root)
+
+    sid_dict = {}
+    for i in range(len(dirpaths)):
+        split_path = dirpaths[i].split("/")
+        subset_name = split_path[-2]
+        sid = split_path[-1]
+        sid_dict[sid] = subset_name
+
+    audio_paths, transcription_texts = {}, {}
+    for key in ds_keys:
+        audio_paths[key] = []
+        transcription_texts[key] = []
+    for filename, text in filename_and_texts:
+        sid = "S" + filename.split("W")[0].split("S")[-1]
+        subset_name = sid_dict[sid]
+        audio_path = dataset_dir + "wav/" + subset_name + \
+            "/" + sid + "/" + filename + ".wav"
+        if subset_name in ds_keys:
+            audio_paths[subset_name].append(audio_path)
+            transcription_texts[subset_name].append(text.replace(" ", ""))
+
+    for key in ds_keys:
+        dataset_dict = {
+            "audio": audio_paths[key], "sentence": transcription_texts[key]}
+        ds_tmp = Dataset.from_dict(dataset_dict)
+        ds_tmp.to_json(dataset_dir + f"{key}.json", index=False)
+
+        ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
+                               streaming=True, features=ds_tmp.features)
+
+    if use_valid_to_train and not test_only:
+        ds["train"] = concatenate_datasets([ds["train"], ds["dev"]])
+
+    ds = ds.cast_column("audio", Audio(sampling_rate=sampling_rate))
+    return ds
 
 
 def load_mdcc(dataset_root, sampling_rate=16000, use_valid_to_train=True, test_only=False):
@@ -34,7 +170,7 @@ def load_mdcc(dataset_root, sampling_rate=16000, use_valid_to_train=True, test_o
 
         dataset_dict = {"audio": audio_paths, "sentence": transcription_texts}
         ds_tmp = Dataset.from_dict(dataset_dict)
-        ds_tmp.to_json(dataset_dir + f"{key}.json")
+        ds_tmp.to_json(dataset_dir + f"{key}.json", index=False)
 
         ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
                                streaming=True, features=ds_tmp.features)
@@ -68,7 +204,7 @@ def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, use_valid_to_t
     return ds
 
 
-def load_process_datasets(datasets_name, processor, dataset_root="./datasets/", test_only=False, num_test_samples=1000,
+def load_process_datasets(datasets_settings, processor, dataset_root="./datasets/", test_only=False, num_test_samples=1000,
                           sampling_rate=16000, max_input_length=30.0, buffer_size=500, seed=42):
 
     def prepare_dataset(batch):
@@ -93,7 +229,8 @@ def load_process_datasets(datasets_name, processor, dataset_root="./datasets/", 
 
     ds = IterableDatasetDict()
     train_list, test_list = [], []
-    for name in datasets_name:
+    for name, kwargs in datasets_settings:
+        print(name, kwargs)
         ds_tmp = None
         if name == "mdcc":
             ds_tmp = load_mdcc(
@@ -101,8 +238,20 @@ def load_process_datasets(datasets_name, processor, dataset_root="./datasets/", 
             print("mdcc: ", next(iter(ds_tmp["test"])))
         elif name == "common_voice":
             ds_tmp = load_common_voice(
-                language_abbr="zh-HK", sampling_rate=sampling_rate, test_only=test_only)
-            print("common_voice: ", next(iter(ds_tmp["test"])))
+                sampling_rate=sampling_rate, test_only=test_only, **kwargs)
+            print(f"common_voice-{kwargs}: ", next(iter(ds_tmp["test"])))
+        elif name == "aishell_1":
+            ds_tmp = load_aishell_1(
+                dataset_root, sampling_rate=sampling_rate, test_only=test_only)
+            print("aishell_1: ", next(iter(ds_tmp["test"])))
+        elif name == "magicdata":
+            ds_tmp = load_magicdata(
+                dataset_root, sampling_rate=sampling_rate, test_only=test_only)
+            print("magicdata: ", next(iter(ds_tmp["test"])))
+        elif name == "thchs_30":
+            ds_tmp = load_thchs_30(
+                dataset_root, sampling_rate=sampling_rate, test_only=test_only)
+            print("thchs_30: ", next(iter(ds_tmp["test"])))
 
         if ds_tmp is not None:
             test_list.append(ds_tmp["test"])
@@ -121,3 +270,9 @@ def load_process_datasets(datasets_name, processor, dataset_root="./datasets/", 
     ds = ds.shuffle(seed, buffer_size=buffer_size)
     ds["test"] = ds["test"].take(num_test_samples)
     return ds
+
+
+if __name__ == "__main__":
+    ds = load_magicdata("datasets/magicdata/")
+    print("train sample: ", next(iter(ds["dev"])))
+    print("test sample: ", next(iter(ds["test"])))
