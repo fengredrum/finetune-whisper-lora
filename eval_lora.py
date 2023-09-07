@@ -17,9 +17,12 @@ task = "transcribe"
 metric = evaluate.load("cer")
 language = "zh"
 # Dataset setups
-datasets_name = [
-    "mdcc",
-    "common_voice",
+datasets_settings = [
+    ["mdcc", {}],
+    ["common_voice", {"language_abbr": "zh-HK"}],
+    ["aishell_1", {}],
+    ["thchs_30", {}],
+    ["magicdata", {}],
 ]
 max_input_length = 30.0
 num_test_samples = 5000
@@ -40,7 +43,7 @@ model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
 # model.config.suppress_tokens = []
 
 ds = load_process_datasets(
-    datasets_name,
+    datasets_settings,
     processor,
     max_input_length=max_input_length,
     num_test_samples=num_test_samples,
