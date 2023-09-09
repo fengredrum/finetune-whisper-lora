@@ -24,17 +24,7 @@ docker exec -it asr bash
 
 ### 2. Prepare Training Data
 
-Download MDCC dataset:
-
-```bash
-mkdir -p datasets/mdcc
-cd datasets/mdcc
-wget https://storage.googleapis.com/samcah-bucket/cantonese-asr/cantonese_dataset.zip
-unzip cantonese_dataset.zip
-rm cantonese_dataset.zip
-```
-
-> Cantonse-ASR: Yu, Tiezheng, Frieske, Rita, Xu, Peng, Cahyawijaya, Samuel, Yiu, Cheuk Tung, Lovenia, Holy, Dai, Wenliang, Barezi, Elham, Chen, Qifeng, Ma, Xiaojuan, Shi, Bertram, Fung, Pascale (2022) "Automatic Speech Recognition Datasets in Cantonese: A Survey and New Dataset", 2022. Link: https://arxiv.org/pdf/2201.02419.pdf
+See detail in [dataset_scripts](dataset_scripts\README.md) folder.
 
 ### 3. Finetune Pretrained Model
 
@@ -58,7 +48,7 @@ python eval_lora.py # LoRA Evaluation
 
 ## Approximate Performance Evaluation
 
-The following models are all trained and evaluated on a single RTX 3090 GPU.
+The following models are all trained and evaluated on a single RTX 3090 GPU via [Vast.ai](https://cloud.vast.ai/?ref_id=78038 "Vast.ai").
 
 ### Cantonese Test Results Comparison
 
