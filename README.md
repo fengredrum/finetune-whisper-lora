@@ -24,7 +24,7 @@ docker exec -it asr bash
 
 ### 2. Prepare Training Data
 
-See detail in [dataset_scripts](dataset_scripts\README.md) folder.
+See detail in [dataset_scripts](dataset_scripts/README.md) folder.
 
 ### 3. Finetune Pretrained Model
 
