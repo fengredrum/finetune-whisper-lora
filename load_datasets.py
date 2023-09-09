@@ -1,6 +1,7 @@
 import os
 
-from datasets import load_dataset, concatenate_datasets, IterableDatasetDict, Dataset, Audio
+from datasets import (load_dataset, concatenate_datasets,
+                      IterableDatasetDict, DatasetDict, Dataset, Audio)
 from tqdm import tqdm
 
 
@@ -10,7 +11,7 @@ def load_filepaths_and_text(filename, split=","):
     return filepaths_and_text
 
 
-def load_magicdata(dataset_root, sampling_rate=16000, use_valid_to_train=False, test_only=False):
+def load_magicdata(dataset_root, sampling_rate=16000, streaming=True, use_valid_to_train=False, test_only=False):
     ds = IterableDatasetDict()
 
     if test_only:
@@ -26,8 +27,13 @@ def load_magicdata(dataset_root, sampling_rate=16000, use_valid_to_train=False, 
                 dataset_dir + "TRANS.txt", split="\t")
             audio_paths[key], transcription_texts[key] = [], []
             for filename, subdir, text in filepaths_and_text[1:]:
-                audio_paths[key].append(dataset_dir + subdir + "/" + filename)
-                transcription_texts[key].append(text)
+                audio_path = dataset_dir + subdir + "/" + filename
+                if os.path.exists(audio_path):
+                    audio_paths[key].append(audio_path)
+                    transcription_texts[key].append(text)
+                else:
+                    print(
+                        f"Skip file: {audio_path}, file path does not exist.")
 
             dataset_dict = {
                 "audio": audio_paths[key], "sentence": transcription_texts[key]}
@@ -35,7 +41,7 @@ def load_magicdata(dataset_root, sampling_rate=16000, use_valid_to_train=False, 
             ds_tmp.to_json(dataset_dir + f"{key}.json", index=False)
 
             ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
-                                   streaming=True, features=ds_tmp.features)
+                                   streaming=streaming, features=ds_tmp.features)
 
     if use_valid_to_train and not test_only:
         ds["train"] = concatenate_datasets([ds["train"], ds["dev"]])
@@ -44,7 +50,7 @@ def load_magicdata(dataset_root, sampling_rate=16000, use_valid_to_train=False, 
     return ds
 
 
-def load_thchs_30(dataset_root, sampling_rate=16000, use_valid_to_train=False, test_only=False):
+def load_thchs_30(dataset_root, sampling_rate=16000, streaming=True, use_valid_to_train=False, test_only=False):
     ds = IterableDatasetDict()
 
     dataset_dir = dataset_root + "thchs_30/data_thchs30/"
@@ -75,7 +81,7 @@ def load_thchs_30(dataset_root, sampling_rate=16000, use_valid_to_train=False, t
         ds_tmp.to_json(dataset_dir + f"{key}.json", index=False)
 
         ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
-                               streaming=True, features=ds_tmp.features)
+                               streaming=streaming, features=ds_tmp.features)
 
     if use_valid_to_train and not test_only:
         ds["train"] = concatenate_datasets([ds["train"], ds["dev"]])
@@ -85,7 +91,7 @@ def load_thchs_30(dataset_root, sampling_rate=16000, use_valid_to_train=False, t
     return ds
 
 
-def load_aishell_1(dataset_root, sampling_rate=16000, use_valid_to_train=False, test_only=False):
+def load_aishell_1(dataset_root, sampling_rate=16000, streaming=True, use_valid_to_train=False, test_only=False):
     ds = IterableDatasetDict()
 
     dataset_dir = dataset_root + "aishell_1/data_aishell/"
@@ -135,7 +141,7 @@ def load_aishell_1(dataset_root, sampling_rate=16000, use_valid_to_train=False, 
         ds_tmp.to_json(dataset_dir + f"{key}.json", index=False)
 
         ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
-                               streaming=True, features=ds_tmp.features)
+                               streaming=streaming, features=ds_tmp.features)
 
     if use_valid_to_train and not test_only:
         ds["train"] = concatenate_datasets([ds["train"], ds["dev"]])
@@ -144,7 +150,7 @@ def load_aishell_1(dataset_root, sampling_rate=16000, use_valid_to_train=False, 
     return ds
 
 
-def load_mdcc(dataset_root, sampling_rate=16000, use_valid_to_train=True, test_only=False):
+def load_mdcc(dataset_root, sampling_rate=16000, streaming=True, use_valid_to_train=True, test_only=False):
     ds = IterableDatasetDict()
 
     dataset_dir = dataset_root + "mdcc/"
@@ -173,7 +179,7 @@ def load_mdcc(dataset_root, sampling_rate=16000, use_valid_to_train=True, test_o
         ds_tmp.to_json(dataset_dir + f"{key}.json", index=False)
 
         ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
-                               streaming=True, features=ds_tmp.features)
+                               streaming=streaming, features=ds_tmp.features)
 
     if use_valid_to_train and not test_only:
         ds["train"] = concatenate_datasets([ds["train"], ds["valid"]])
@@ -182,14 +188,14 @@ def load_mdcc(dataset_root, sampling_rate=16000, use_valid_to_train=True, test_o
     return ds
 
 
-def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, use_valid_to_train=True, test_only=False):
+def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, streaming=True, use_valid_to_train=True, test_only=False):
     dataset_name = "mozilla-foundation/common_voice_11_0"
     ds = IterableDatasetDict()
 
     ds["train"] = load_dataset(
-        dataset_name, language_abbr, split="train", streaming=True, use_auth_token=True)
+        dataset_name, language_abbr, split="train", streaming=streaming, use_auth_token=True)
     ds["test"] = load_dataset(
-        dataset_name, language_abbr, split="test", streaming=True, use_auth_token=True)
+        dataset_name, language_abbr, split="test", streaming=streaming, use_auth_token=True)
     if use_valid_to_train:
         ds["valid"] = load_dataset(
             dataset_name, language_abbr, split="validation", streaming=True)
@@ -204,8 +210,8 @@ def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, use_valid_to_t
     return ds
 
 
-def load_process_datasets(datasets_settings, processor, dataset_root="./datasets/", test_only=False, num_test_samples=1000,
-                          sampling_rate=16000, max_input_length=30.0, buffer_size=500, seed=42):
+def load_process_datasets(datasets_settings, processor, dataset_root="./datasets/", streaming=True, test_only=False, num_test_samples=1000,
+                          sampling_rate=16000, max_input_length=30.0, num_proc=2, buffer_size=500, seed=42):
 
     def prepare_dataset(batch):
         # load and (possibly) resample audio data to 16kHz
@@ -227,7 +233,11 @@ def load_process_datasets(datasets_settings, processor, dataset_root="./datasets
     def is_audio_in_length_range(length):
         return length < max_input_length
 
-    ds = IterableDatasetDict()
+    if streaming:
+        ds = IterableDatasetDict()
+    else:
+        ds = DatasetDict()
+
     train_list, test_list = [], []
     for name, kwargs in datasets_settings:
         print(name, kwargs)
@@ -250,7 +260,7 @@ def load_process_datasets(datasets_settings, processor, dataset_root="./datasets
             print("magicdata: ", next(iter(ds_tmp["test"])))
         elif name == "thchs_30":
             ds_tmp = load_thchs_30(
-                dataset_root, sampling_rate=sampling_rate, test_only=test_only)
+                dataset_root, sampling_rate=sampling_rate, streaming=streaming, test_only=test_only)
             print("thchs_30: ", next(iter(ds_tmp["test"])))
 
         if ds_tmp is not None:
@@ -261,18 +271,53 @@ def load_process_datasets(datasets_settings, processor, dataset_root="./datasets
     ds["test"] = concatenate_datasets(test_list)
     if not test_only:
         ds["train"] = concatenate_datasets(train_list)
-    ds = ds.map(prepare_dataset,
-                # remove_columns=list(next(iter(ds.values())).features),
-                ).with_format("torch")
 
-    ds = ds.filter(
-        is_audio_in_length_range, input_columns=["input_length"])
-    ds = ds.shuffle(seed, buffer_size=buffer_size)
-    ds["test"] = ds["test"].take(num_test_samples)
+    if streaming:
+        ds = ds.map(prepare_dataset,
+                    remove_columns=list(next(iter(ds.values())).features),
+                    ).with_format("torch")
+        ds = ds.filter(
+            is_audio_in_length_range, input_columns=["input_length"])
+        ds = ds.shuffle(seed, buffer_size=buffer_size)
+        ds["test"] = ds["test"].take(num_test_samples)
+    else:
+        ds["test"] = ds["test"].select(range(num_test_samples))
+        ds = ds.map(prepare_dataset,
+                    remove_columns=ds["test"].column_names,
+                    num_proc=num_proc,
+                    ).with_format("torch")
+
     return ds
 
 
 if __name__ == "__main__":
-    ds = load_magicdata("datasets/magicdata/")
-    print("train sample: ", next(iter(ds["dev"])))
-    print("test sample: ", next(iter(ds["test"])))
+    from transformers import WhisperProcessor, WhisperTokenizer
+
+    # Model setups
+    model_name_or_path = "Oblivion208/whisper-tiny-cantonese"
+    task = "transcribe"
+    language = "zh"
+    # Dataset setups
+    datasets_settings = [
+        ["mdcc", {}],
+        ["common_voice", {"language_abbr": "zh-HK"}],
+        ["aishell_1", {}],
+        ["thchs_30", {}],
+        ["magicdata", {}],
+    ]
+    max_input_length = 30.0
+    num_test_samples = 100
+    batch_size = 64
+
+    tokenizer = WhisperTokenizer.from_pretrained(model_name_or_path, task=task)
+    processor = WhisperProcessor.from_pretrained(model_name_or_path, task=task)
+    ds = load_process_datasets(
+        datasets_settings,
+        processor,
+        max_input_length=max_input_length,
+        num_test_samples=num_test_samples,
+        test_only=True,
+        streaming=False,
+        num_proc=2,
+    )
+    print(ds)
