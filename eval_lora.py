@@ -12,7 +12,7 @@ from tqdm import tqdm
 from load_datasets import load_process_datasets
 
 # Model setups
-peft_model_id = "Oblivion208/whisper-large-v2-lora-cantonese"
+peft_model_id = "Oblivion208/whisper-large-v2-lora-mix"
 task = "transcribe"
 metric = evaluate.load("cer")
 language = "zh"
@@ -28,19 +28,12 @@ max_input_length = 30.0
 num_test_samples = 5000
 batch_size = 64
 
-# TODO 8-bit training and inference very slow
 peft_config = PeftConfig.from_pretrained(peft_model_id)
-model = WhisperForConditionalGeneration.from_pretrained(
-    peft_config.base_model_name_or_path, load_in_8bit=True, device_map="auto")
-model = PeftModel.from_pretrained(model, peft_model_id)
 tokenizer = WhisperTokenizer.from_pretrained(
     peft_config.base_model_name_or_path, task=task)
 processor = WhisperProcessor.from_pretrained(
     peft_config.base_model_name_or_path, task=task)
 feature_extractor = processor.feature_extractor
-model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
-    language=language, task=task)
-# model.config.suppress_tokens = []
 
 ds = load_process_datasets(
     datasets_settings,
@@ -48,6 +41,8 @@ ds = load_process_datasets(
     max_input_length=max_input_length,
     num_test_samples=num_test_samples,
     test_only=True,
+    streaming=False,
+    num_proc=4,
 )
 print("test sample: ", next(iter(ds["test"])))
 
@@ -91,7 +86,15 @@ eval_dataloader = DataLoader(
 forced_decoder_ids = processor.get_decoder_prompt_ids(
     language=language, task=task)
 
+# TODO 8-bit training and inference very slow
+model = WhisperForConditionalGeneration.from_pretrained(
+    peft_config.base_model_name_or_path, load_in_8bit=True, device_map="auto")
+model = PeftModel.from_pretrained(model, peft_model_id)
+model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
+    language=language, task=task)
+# model.config.suppress_tokens = []
 model.eval()
+
 for step, batch in enumerate(tqdm(eval_dataloader)):
     with torch.cuda.amp.autocast():
         with torch.no_grad():
