@@ -27,14 +27,11 @@ max_input_length = 30.0
 num_test_samples = 5000
 batch_size = 64
 
-model = WhisperForConditionalGeneration.from_pretrained(
-    model_name_or_path).to("cuda")
-tokenizer = WhisperTokenizer.from_pretrained(model_name_or_path, task=task)
-processor = WhisperProcessor.from_pretrained(model_name_or_path, task=task)
+tokenizer = WhisperTokenizer.from_pretrained(
+    model_name_or_path, task=task, language=language)
+processor = WhisperProcessor.from_pretrained(
+    model_name_or_path, task=task, language=language)
 feature_extractor = processor.feature_extractor
-model.config.forced_decoder_ids = None
-model.config.suppress_tokens = []
-# model.config.use_cache = False
 
 ds = load_process_datasets(
     datasets_settings,
@@ -42,6 +39,8 @@ ds = load_process_datasets(
     max_input_length=max_input_length,
     num_test_samples=num_test_samples,
     test_only=True,
+    streaming=False,
+    num_proc=4,
 )
 print("test sample: ", next(iter(ds["test"])))
 
@@ -83,7 +82,13 @@ data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
 eval_dataloader = DataLoader(
     ds["test"], batch_size=batch_size, collate_fn=data_collator)
 
+model = WhisperForConditionalGeneration.from_pretrained(
+    model_name_or_path).to("cuda")
+model.config.forced_decoder_ids = None
+model.config.suppress_tokens = []
+# model.config.use_cache = False
 model.eval()
+
 for step, batch in enumerate(tqdm(eval_dataloader)):
     with torch.no_grad():
         generated_tokens = (
