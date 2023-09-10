@@ -30,9 +30,9 @@ batch_size = 64
 
 peft_config = PeftConfig.from_pretrained(peft_model_id)
 tokenizer = WhisperTokenizer.from_pretrained(
-    peft_config.base_model_name_or_path, task=task)
+    peft_config.base_model_name_or_path, task=task, language=language)
 processor = WhisperProcessor.from_pretrained(
-    peft_config.base_model_name_or_path, task=task)
+    peft_config.base_model_name_or_path, task=task, language=language)
 feature_extractor = processor.feature_extractor
 
 ds = load_process_datasets(
