@@ -38,6 +38,8 @@ ds = load_process_datasets(
     processor,
     max_input_length=max_input_length,
     num_test_samples=num_test_samples,
+    streaming=False,
+    num_proc=4,
 )
 print("train sample: ", next(iter(ds["train"])))
 print("test sample: ", next(iter(ds["test"])))
@@ -110,7 +112,7 @@ training_args = Seq2SeqTrainingArguments(
     evaluation_strategy="steps",
     optim="adamw_torch",
     fp16=True,
-    per_device_eval_batch_size=16,
+    per_device_eval_batch_size=32,
     predict_with_generate=True,
     generation_max_length=225,
     save_steps=1000,
