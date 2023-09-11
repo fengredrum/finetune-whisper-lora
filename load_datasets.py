@@ -3,7 +3,6 @@ import gc
 
 from datasets import (load_dataset, concatenate_datasets,
                       IterableDatasetDict, DatasetDict, Dataset, Audio)
-from tqdm import tqdm
 
 
 def load_filepaths_and_text(filename, split=","):
@@ -174,41 +173,39 @@ def load_aishell_1(
     return ds
 
 
-def load_mdcc(dataset_root, sampling_rate=16000, streaming=True, use_valid_to_train=True, test_only=False):
-    ds = IterableDatasetDict()
-
+def load_mdcc(
+        dataset_root, sampling_rate=16000,
+        streaming=True, cache_dir="~/.cache/huggingface/datasets",
+        use_valid_to_train=False, test_only=False,
+):
     dataset_dir = dataset_root + "mdcc/"
+
     if test_only:
         ds_keys = ["test"]
     else:
         ds_keys = ["train", "valid", "test"]
+    
+    audio_paths, transcription_texts = {}, {}
     for key in ds_keys:
         filelist = dataset_dir + f"cnt_asr_{key}_metadata.csv"
         filepaths_and_text = load_filepaths_and_text(filelist)
         filepaths_and_text[0].append("transcription")
-        audio_paths, transcription_texts = [], []
-
-        for i in tqdm(range(1, len(filepaths_and_text))):
+        audio_paths[key], transcription_texts[key] = [], []
+        for i in range(1, len(filepaths_and_text)):
             audio_path = dataset_dir + filepaths_and_text[i][0][2:]
-            audio_paths.append(audio_path)
+            audio_paths[key].append(audio_path)
 
             transcription_path = dataset_dir + filepaths_and_text[i][1][2:]
             with open(transcription_path, encoding='utf-8') as f:
                 transcription = [line.strip() for line in f][0]
-            filepaths_and_text[i].append(transcription)
-            transcription_texts.append(transcription)
+            # filepaths_and_text[i].append(transcription)
+            transcription_texts[key].append(transcription)
 
-        dataset_dict = {"audio": audio_paths, "sentence": transcription_texts}
-        ds_tmp = Dataset.from_dict(dataset_dict)
-        ds_tmp.to_json(dataset_dir + f"{key}.json", index=False)
-
-        ds[key] = load_dataset("json", data_files=dataset_dir + f"/{key}.json", split='train',
-                               streaming=streaming, features=ds_tmp.features)
-
-    if use_valid_to_train and not test_only:
-        ds["train"] = concatenate_datasets([ds["train"], ds["valid"]])
-
-    ds = ds.cast_column("audio", Audio(sampling_rate=sampling_rate))
+    ds = create_dataset(
+        dataset_dir=dataset_dir, ds_keys=ds_keys, audio_paths=audio_paths, transcription_texts=transcription_texts,
+        sampling_rate=sampling_rate, streaming=streaming, cache_dir=cache_dir,
+        use_valid_to_train=use_valid_to_train, test_only=test_only,
+    )   
     return ds
 
 
@@ -269,7 +266,8 @@ def load_process_datasets(datasets_settings, processor, dataset_root="./datasets
         ds_tmp = None
         if name == "mdcc":
             ds_tmp = load_mdcc(
-                dataset_root, sampling_rate=sampling_rate, test_only=test_only)
+                dataset_root, sampling_rate=sampling_rate,
+                streaming=streaming, cache_dir=cache_dir, test_only=test_only)
             print("mdcc: ", next(iter(ds_tmp["test"])))
         elif name == "common_voice":
             ds_tmp = load_common_voice(
