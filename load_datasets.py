@@ -184,7 +184,7 @@ def load_mdcc(
         ds_keys = ["test"]
     else:
         ds_keys = ["train", "valid", "test"]
-    
+
     audio_paths, transcription_texts = {}, {}
     for key in ds_keys:
         filelist = dataset_dir + f"cnt_asr_{key}_metadata.csv"
@@ -205,21 +205,32 @@ def load_mdcc(
         dataset_dir=dataset_dir, ds_keys=ds_keys, audio_paths=audio_paths, transcription_texts=transcription_texts,
         sampling_rate=sampling_rate, streaming=streaming, cache_dir=cache_dir,
         use_valid_to_train=use_valid_to_train, test_only=test_only,
-    )   
+    )
+
     return ds
 
 
-def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, streaming=True, use_valid_to_train=True, test_only=False):
+def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, streaming=True, cache_dir="~/.cache/huggingface/datasets", use_valid_to_train=True, test_only=False):
     dataset_name = "mozilla-foundation/common_voice_11_0"
-    ds = IterableDatasetDict()
 
-    ds["train"] = load_dataset(
-        dataset_name, language_abbr, split="train", streaming=streaming, use_auth_token=True)
+    if streaming:
+        ds = IterableDatasetDict()
+    else:
+        ds = DatasetDict()
+
     ds["test"] = load_dataset(
-        dataset_name, language_abbr, split="test", streaming=streaming, use_auth_token=True)
-    if use_valid_to_train:
+        dataset_name, language_abbr, split="test",
+        streaming=streaming, cache_dir=cache_dir, use_auth_token=True)
+
+    if not test_only:
+        ds["train"] = load_dataset(
+            dataset_name, language_abbr, split="train",
+            streaming=streaming, cache_dir=cache_dir, use_auth_token=True)
+
+    if use_valid_to_train and not test_only:
         ds["valid"] = load_dataset(
-            dataset_name, language_abbr, split="validation", streaming=True)
+            dataset_name, language_abbr, split="validation",
+            streaming=streaming, cache_dir=cache_dir, use_auth_token=True)
         ds["train"] = concatenate_datasets([ds["train"], ds["valid"]])
 
     ds = ds.remove_columns(
@@ -271,7 +282,8 @@ def load_process_datasets(datasets_settings, processor, dataset_root="./datasets
             print("mdcc: ", next(iter(ds_tmp["test"])))
         elif name == "common_voice":
             ds_tmp = load_common_voice(
-                sampling_rate=sampling_rate, test_only=test_only, **kwargs)
+                sampling_rate=sampling_rate,
+                streaming=streaming, cache_dir=cache_dir, test_only=test_only, **kwargs)
             print(f"common_voice-{kwargs}: ", next(iter(ds_tmp["test"])))
         elif name == "aishell_1":
             ds_tmp = load_aishell_1(
