@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import evaluate
+import argparse
 import gc
 
 from transformers import WhisperProcessor, WhisperTokenizer, WhisperForConditionalGeneration
@@ -10,41 +11,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 from tqdm import tqdm
 from load_datasets import load_process_datasets
-
-# Model setups
-peft_model_id = "Oblivion208/whisper-large-v2-lora-mix"
-task = "transcribe"
-metric = evaluate.load("cer")
-language = "zh"
-# Dataset setups
-datasets_settings = [
-    ["mdcc", {}],
-    ["common_voice", {"language_abbr": "zh-HK"}],
-    ["aishell_1", {}],
-    ["thchs_30", {}],
-    ["magicdata", {}],
-]
-max_input_length = 30.0
-num_test_samples = 5000
-batch_size = 64
-
-peft_config = PeftConfig.from_pretrained(peft_model_id)
-tokenizer = WhisperTokenizer.from_pretrained(
-    peft_config.base_model_name_or_path, task=task, language=language)
-processor = WhisperProcessor.from_pretrained(
-    peft_config.base_model_name_or_path, task=task, language=language)
-feature_extractor = processor.feature_extractor
-
-ds = load_process_datasets(
-    datasets_settings,
-    processor,
-    max_input_length=max_input_length,
-    num_test_samples=num_test_samples,
-    test_only=True,
-    streaming=False,
-    num_proc=4,
-)
-print("test sample: ", next(iter(ds["test"])))
 
 
 @dataclass
@@ -80,42 +46,93 @@ class DataCollatorSpeechSeq2SeqWithPadding:
         return batch
 
 
-data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
-eval_dataloader = DataLoader(
-    ds["test"], batch_size=batch_size, collate_fn=data_collator)
-forced_decoder_ids = processor.get_decoder_prompt_ids(
-    language=language, task=task)
+# TODO Move to ArgumentParser
+datasets_settings = [
+    ["mdcc", {}],
+    ["common_voice", {"language_abbr": "zh-HK"}],
+    ["aishell_1", {}],
+    ["thchs_30", {}],
+    ["magicdata", {}],
+]
 
-# TODO 8-bit training and inference very slow
-model = WhisperForConditionalGeneration.from_pretrained(
-    peft_config.base_model_name_or_path, load_in_8bit=True, device_map="auto")
-model = PeftModel.from_pretrained(model, peft_model_id)
-model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
-    language=language, task=task)
-# model.config.suppress_tokens = []
-model.eval()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
 
-for step, batch in enumerate(tqdm(eval_dataloader)):
-    with torch.cuda.amp.autocast():
-        with torch.no_grad():
-            generated_tokens = (
-                model.generate(
-                    input_features=batch["input_features"].to("cuda"),
-                    forced_decoder_ids=forced_decoder_ids,
-                    max_new_tokens=255,
-                ).cpu().numpy()
-            )
-            labels = batch["labels"].cpu().numpy()
-            labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-            decoded_preds = tokenizer.batch_decode(
-                generated_tokens, skip_special_tokens=True)
-            decoded_labels = tokenizer.batch_decode(
-                labels, skip_special_tokens=True)
-            metric.add_batch(
-                predictions=decoded_preds,
-                references=decoded_labels,
-            )
-    del generated_tokens, labels, batch
-    gc.collect()
-cer = 100 * metric.compute()
-print(f"{cer=}")
+    # Model setups
+    parser.add_argument("--peft_model_id",
+                        default="Oblivion208/whisper-large-v2-lora-mix")
+    parser.add_argument("--task", default="transcribe")
+    parser.add_argument("--language", default="zh")
+    parser.add_argument("--batch_size", default=64, type=int)
+    parser.add_argument("--max_new_tokens", default=255, type=int)
+    parser.add_argument("--metric", default="cer")
+    parser.add_argument("--device", default="cuda")
+    # Dataset setups
+    parser.add_argument("--num_test_samples", default=1000, type=int)
+    parser.add_argument("--max_input_length", default=30.0, type=float)
+    parser.add_argument("--test_only", default=True, type=bool)
+    parser.add_argument("--streaming", default=False, type=bool)
+    parser.add_argument("--num_proc", default=4, type=int)
+
+    args = parser.parse_args()
+    print(f"Settings: {args}")
+
+    peft_config = PeftConfig.from_pretrained(args.peft_model_id)
+    tokenizer = WhisperTokenizer.from_pretrained(
+        peft_config.base_model_name_or_path, task=args.task, language=args.language)
+    processor = WhisperProcessor.from_pretrained(
+        peft_config.base_model_name_or_path, task=args.task, language=args.language)
+    feature_extractor = processor.feature_extractor
+    forced_decoder_ids = processor.get_decoder_prompt_ids(
+        language=args.language, task=args.task)
+
+    ds = load_process_datasets(
+        datasets_settings,
+        processor,
+        max_input_length=args.max_input_length,
+        num_test_samples=args.num_test_samples,
+        test_only=args.test_only,
+        streaming=args.streaming,
+        num_proc=args.num_proc,
+    )
+    print("test sample: ", next(iter(ds["test"])))
+
+    data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
+    eval_dataloader = DataLoader(
+        ds["test"], batch_size=args.batch_size, collate_fn=data_collator)
+
+    # TODO 8-bit training and inference very slow
+    model = WhisperForConditionalGeneration.from_pretrained(
+        peft_config.base_model_name_or_path, load_in_8bit=True).to(args.device)
+    model = PeftModel.from_pretrained(model, args.peft_model_id)
+    model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
+        language=args.language, task=args.task)
+    # model.config.suppress_tokens = []
+    model.eval()
+
+    metric = evaluate.load(args.metric)
+    for step, batch in enumerate(tqdm(eval_dataloader)):
+        with torch.cuda.amp.autocast():
+            with torch.no_grad():
+                generated_tokens = (
+                    model.generate(
+                        input_features=batch["input_features"].to(args.device),
+                        forced_decoder_ids=forced_decoder_ids,
+                        max_new_tokens=args.max_new_tokens,
+                    ).cpu().numpy()
+                )
+                labels = batch["labels"].cpu().numpy()
+                labels = np.where(labels != -100, labels,
+                                  tokenizer.pad_token_id)
+                decoded_preds = tokenizer.batch_decode(
+                    generated_tokens, skip_special_tokens=True)
+                decoded_labels = tokenizer.batch_decode(
+                    labels, skip_special_tokens=True)
+                metric.add_batch(
+                    predictions=decoded_preds,
+                    references=decoded_labels,
+                )
+        del generated_tokens, labels, batch
+        gc.collect()
+    cer = 100 * metric.compute()
+    print(f"{cer=}")

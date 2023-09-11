@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import evaluate
+import argparse
 import gc
 
 from transformers import WhisperProcessor, WhisperTokenizer, WhisperForConditionalGeneration
@@ -9,40 +10,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 from tqdm import tqdm
 from load_datasets import load_process_datasets
-
-# Model setups
-model_name_or_path = "Oblivion208/whisper-tiny-cantonese"
-task = "transcribe"
-metric = evaluate.load("cer")
-language = "zh"
-# Dataset setups
-datasets_settings = [
-    ["mdcc", {}],
-    ["common_voice", {"language_abbr": "zh-HK"}],
-    ["aishell_1", {}],
-    ["thchs_30", {}],
-    ["magicdata", {}],
-]
-max_input_length = 30.0
-num_test_samples = 5000
-batch_size = 64
-
-tokenizer = WhisperTokenizer.from_pretrained(
-    model_name_or_path, task=task, language=language)
-processor = WhisperProcessor.from_pretrained(
-    model_name_or_path, task=task, language=language)
-feature_extractor = processor.feature_extractor
-
-ds = load_process_datasets(
-    datasets_settings,
-    processor,
-    max_input_length=max_input_length,
-    num_test_samples=num_test_samples,
-    test_only=True,
-    streaming=False,
-    num_proc=4,
-)
-print("test sample: ", next(iter(ds["test"])))
 
 
 @dataclass
@@ -78,38 +45,87 @@ class DataCollatorSpeechSeq2SeqWithPadding:
         return batch
 
 
-data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
-eval_dataloader = DataLoader(
-    ds["test"], batch_size=batch_size, collate_fn=data_collator)
+# TODO Move to ArgumentParser
+datasets_settings = [
+    ["mdcc", {}],
+    ["common_voice", {"language_abbr": "zh-HK"}],
+    ["aishell_1", {}],
+    ["thchs_30", {}],
+    ["magicdata", {}],
+]
 
-model = WhisperForConditionalGeneration.from_pretrained(
-    model_name_or_path).to("cuda")
-model.config.forced_decoder_ids = None
-model.config.suppress_tokens = []
-# model.config.use_cache = False
-model.eval()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
 
-for step, batch in enumerate(tqdm(eval_dataloader)):
-    with torch.no_grad():
-        generated_tokens = (
-            model.generate(
-                input_features=batch["input_features"].to("cuda"),
-                return_dict_in_generate=True,
-                max_new_tokens=255,
+    # Model setups
+    parser.add_argument("--model_name_or_path",
+                        default="Oblivion208/whisper-tiny-cantonese")
+    parser.add_argument("--task", default="transcribe")
+    parser.add_argument("--language", default="zh")
+    parser.add_argument("--batch_size", default=64, type=int)
+    parser.add_argument("--max_new_tokens", default=255, type=int)
+    parser.add_argument("--metric", default="cer")
+    parser.add_argument("--device", default="cuda")
+    # Dataset setups
+    parser.add_argument("--num_test_samples", default=1000, type=int)
+    parser.add_argument("--max_input_length", default=30.0, type=float)
+    parser.add_argument("--test_only", default=True, type=bool)
+    parser.add_argument("--streaming", default=False, type=bool)
+    parser.add_argument("--num_proc", default=4, type=int)
+
+    args = parser.parse_args()
+    print(f"Settings: {args}")
+
+    tokenizer = WhisperTokenizer.from_pretrained(
+        args.model_name_or_path, task=args.task, language=args.language)
+    processor = WhisperProcessor.from_pretrained(
+        args.model_name_or_path, task=args.task, language=args.language)
+    feature_extractor = processor.feature_extractor
+
+    ds = load_process_datasets(
+        datasets_settings,
+        processor,
+        max_input_length=args.max_input_length,
+        num_test_samples=args.num_test_samples,
+        test_only=args.test_only,
+        streaming=args.streaming,
+        num_proc=args.num_proc,
+    )
+    print("test sample: ", next(iter(ds["test"])))
+
+    data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
+    eval_dataloader = DataLoader(
+        ds["test"], batch_size=args.batch_size, collate_fn=data_collator)
+
+    model = WhisperForConditionalGeneration.from_pretrained(
+        args.model_name_or_path).to(args.device)
+    model.config.forced_decoder_ids = None
+    model.config.suppress_tokens = []
+    # model.config.use_cache = False
+    model.eval()
+
+    metric = evaluate.load(args.metric)
+    for step, batch in enumerate(tqdm(eval_dataloader)):
+        with torch.no_grad():
+            generated_tokens = (
+                model.generate(
+                    input_features=batch["input_features"].to(args.device),
+                    return_dict_in_generate=True,
+                    max_new_tokens=args.max_new_tokens,
+                )
+            ).sequences.cpu().numpy()
+
+            labels = batch["labels"].cpu().numpy()
+            labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+            decoded_preds = tokenizer.batch_decode(
+                generated_tokens, skip_special_tokens=True)
+            decoded_labels = tokenizer.batch_decode(
+                labels, skip_special_tokens=True)
+            metric.add_batch(
+                predictions=decoded_preds,
+                references=decoded_labels,
             )
-        ).sequences.cpu().numpy()
-
-        labels = batch["labels"].cpu().numpy()
-        labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-        decoded_preds = tokenizer.batch_decode(
-            generated_tokens, skip_special_tokens=True)
-        decoded_labels = tokenizer.batch_decode(
-            labels, skip_special_tokens=True)
-        metric.add_batch(
-            predictions=decoded_preds,
-            references=decoded_labels,
-        )
-    del generated_tokens, labels, batch
-    gc.collect()
-cer = 100 * metric.compute()
-print(f"{cer=}")
+        del generated_tokens, labels, batch
+        gc.collect()
+    cer = 100 * metric.compute()
+    print(f"{cer=}")
