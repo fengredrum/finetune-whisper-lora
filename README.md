@@ -1,4 +1,4 @@
-# Finetune-Whisper-LoRA
+# Finetune Whisper using LoRA for Cantonese and Mandarin
 
 <p align="left">
 🤗 <a href="https://huggingface.co/Oblivion208" target="_blank">HF Repo</a>  •🐱 <a href="https://github.com/fengredrum/finetune-whisper-lora" target="_blank">Github Repo</a> 
@@ -29,22 +29,28 @@ See detail in [dataset_scripts](dataset_scripts/README.md) folder.
 ### 3. Finetune Pretrained Model
 
 ```bash
-python finetune.py # Finetuning
+# Finetuning
+python finetune.py --model_id base --streaming True --train_batch_size 64 --gradient_accumulation_steps 2 --fp16 True
 ```
 
 ```bash
-python finetune_lora.py # LoRA Finetuning
+# LoRA Finetuning
+python finetune_lora.py --model_id large-v2 --streaming True --train_batch_size 64 --gradient_accumulation_steps 2
 ```
 
 ### 4. Evaluate Performance
 
 ```bash
-python eval.py # Evaluation
+# Evaluation
+python eval.py --model_name_or_path Oblivion208/whisper-tiny-cantonese --streaming True --batch_size 64
 ```
 
 ```bash
-python eval_lora.py # LoRA Evaluation
+# LoRA Evaluation
+python eval_lora.py --peft_model_id Oblivion208/whisper-large-v2-lora-mix --streaming True --batch_size 64
 ```
+
+**Note:** Setting `--streaming` to `False` will cache acoustic features on local disk, which speeds up finetuning processes, but it increases the disk usage dramatically (almost three times of raw audio files size).
 
 ## Approximate Performance Evaluation
 
