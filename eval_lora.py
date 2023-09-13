@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
     # TODO 8-bit training and inference very slow
     model = WhisperForConditionalGeneration.from_pretrained(
-        peft_config.base_model_name_or_path, load_in_8bit=True).to(args.device)
+        peft_config.base_model_name_or_path, load_in_8bit=True, device_map="auto")
     model = PeftModel.from_pretrained(model, args.peft_model_id)
     model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
         language=args.language, task=args.task)
