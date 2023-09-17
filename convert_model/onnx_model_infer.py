@@ -5,7 +5,7 @@ from transformers import AutoProcessor
 from optimum.onnxruntime import ORTModelForSpeechSeq2Seq
 
 
-onnx_dir = "models/onnx_model"
+onnx_dir = "models/vanilla_onnx"
 task = "transcribe"
 language = "zh"
 
