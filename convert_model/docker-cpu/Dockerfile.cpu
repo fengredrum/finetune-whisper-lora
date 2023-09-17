@@ -1,0 +1,23 @@
+# Stage 1: Builder/Compiler
+FROM python:3.10-slim AS compile-image
+
+# Update and install packages
+RUN apt update && \
+    apt install --no-install-recommends -y gcc gcc-multilib build-essential && \
+    apt clean && rm -rf /var/lib/apt/lists/*
+# Install Pytorch
+RUN pip3 install --no-cache-dir --user \
+    torch==2.0.0+cpu torchaudio==2.0.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+# Install dependencies
+COPY requirements.txt /
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir --user -r /requirements.txt
+
+# Stage 2: Runtime
+FROM python:3.10-slim AS runtime-image
+COPY --from=compile-image /root/.local /root/.local
+# Environment Setup
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai \
+    PATH=/root/.local/bin:$PATH \
+    PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
