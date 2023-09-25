@@ -1,0 +1,8 @@
+# Stage 1: Builder/Compiler
+FROM jinaai/jina:3.20.3-py310-standard AS compile-image
+
+# Install dependencies
+COPY requirements.txt /
+RUN --mount=type=cache,target=./build_cache/pip \
+    pip3 install --upgrade pip && \
+    pip3 install --default-timeout=1000 --compile -r /requirements.txt

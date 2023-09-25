@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  asr-serving:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    image: oblivion208/asr-serving:0.1.0-cpu
+    container_name: asr-serving
+    tty: true
+    ipc: "host"
+    ports:
+      - 8000:8000
+      - 8888:8888
+    working_dir: /app
+    volumes:
+      - ../:/app
+    entrypoint: ["bash"]
