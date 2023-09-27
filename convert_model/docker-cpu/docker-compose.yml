@@ -1,12 +1,12 @@
 version: "3.9"
 
 services:
-  asr-demo:
+  asr-infer:
     build:
       context: .
-      dockerfile: Dockerfile.cpu
-    image: oblivion208/asr-infer:0.1.0-cpu
-    container_name: asr-cpu
+      dockerfile: Dockerfile.cpu-dev
+    image: oblivion208/asr-infer:0.1.0-dev-cpu
+    container_name: asr-infer
     tty: true
     ipc: "host"
     ports:
@@ -15,5 +15,4 @@ services:
     working_dir: /app
     volumes:
       - ../:/app
-      - ../cache:/root/.cache/
     command: bash

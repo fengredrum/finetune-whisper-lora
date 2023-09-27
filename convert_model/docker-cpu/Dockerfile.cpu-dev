@@ -5,15 +5,13 @@ FROM python:3.10-slim AS compile-image
 RUN apt update && \
     apt install --no-install-recommends -y gcc gcc-multilib build-essential git && \
     apt clean && rm -rf /var/lib/apt/lists/*
-# Install Pytorch
-RUN pip3 install --no-cache-dir --user \
-    torch==2.0.0+cpu torchaudio==2.0.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 # Install dependencies
 COPY requirements.txt /
 RUN pip3 install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir --user -r /requirements.txt && \
-    pip3 uninstall -y onnxruntime ort-nightly && \
-    pip3 install ort-nightly==1.16.0.dev20230629002 --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
+    pip3 install --no-cache-dir --user -r /requirements.txt
+    
+# RUN pip3 uninstall -y onnxruntime ort-nightly && \
+#     pip3 install --no-cache-dir --user ort-nightly==1.16.0.dev20230629002 --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
 
 # Stage 2: Runtime
 FROM python:3.10-slim AS runtime-image
