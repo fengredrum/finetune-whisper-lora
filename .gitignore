@@ -165,5 +165,4 @@ hf_hub/
 cache/
 logs/
 datasets/
-convert_model/models
 test.py
