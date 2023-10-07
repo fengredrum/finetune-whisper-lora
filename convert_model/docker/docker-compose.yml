@@ -4,8 +4,8 @@ services:
   asr-infer:
     build:
       context: .
-      dockerfile: Dockerfile.cpu-dev
-    image: oblivion208/asr-infer:0.1.0-dev-cpu
+      dockerfile: Dockerfile-dev
+    image: oblivion208/asr-infer:0.1.0-dev
     container_name: asr-infer
     tty: true
     ipc: "host"
