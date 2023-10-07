@@ -1,0 +1,4 @@
+whisper_cpu_*
+whisper_gpu_*
+cache/
+models/
