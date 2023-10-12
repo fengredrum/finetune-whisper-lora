@@ -220,17 +220,17 @@ def load_common_voice(language_abbr="zh-HK", sampling_rate=16000, streaming=True
 
     ds["test"] = load_dataset(
         dataset_name, language_abbr, split="test",
-        streaming=streaming, cache_dir=cache_dir, use_auth_token=True)
+        streaming=streaming, cache_dir=cache_dir, token=True)
 
     if not test_only:
         ds["train"] = load_dataset(
             dataset_name, language_abbr, split="train",
-            streaming=streaming, cache_dir=cache_dir, use_auth_token=True)
+            streaming=streaming, cache_dir=cache_dir, token=True)
 
     if use_valid_to_train and not test_only:
         ds["valid"] = load_dataset(
             dataset_name, language_abbr, split="validation",
-            streaming=streaming, cache_dir=cache_dir, use_auth_token=True)
+            streaming=streaming, cache_dir=cache_dir, token=True)
         ds["train"] = concatenate_datasets([ds["train"], ds["valid"]])
 
     ds = ds.remove_columns(
