@@ -1,8 +1,8 @@
 import torch
 import argparse
 
-from transformers import WhisperProcessor, WhisperTokenizer, WhisperFeatureExtractor, WhisperForConditionalGeneration, Seq2SeqTrainingArguments, Seq2SeqTrainer, Seq2SeqTrainer
-from peft import prepare_model_for_kbit_training, LoraConfig, LoraConfig, get_peft_model
+from transformers import WhisperProcessor, WhisperForConditionalGeneration, Seq2SeqTrainingArguments, Seq2SeqTrainer
+from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 from load_datasets import load_process_datasets
@@ -54,22 +54,27 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Model setups
-    parser.add_argument("--model_id", default="large-v2")
-    parser.add_argument("--task", default="transcribe")
-    parser.add_argument("--language", default="zh")
+    parser.add_argument("--model_id", default="large-v2", type=str)
+    parser.add_argument("--task", default="transcribe", type=str)
+    parser.add_argument("--language", default="zh", type=str)
+    parser.add_argument("--device", default="auto", type=str)
     parser.add_argument("--max_new_tokens", default=225, type=int)
-    parser.add_argument("--device", default="cuda")
     # Dataset setups
     parser.add_argument("--num_test_samples", default=1000, type=int)
     parser.add_argument("--max_input_length", default=30.0, type=float)
     parser.add_argument("--streaming", default=False, type=bool)
     parser.add_argument("--num_proc", default=4, type=int)
+    # LoRA setups
+    parser.add_argument("--r", default=32, type=int)
+    parser.add_argument("--lora_alpha", default=64, type=int)
+    parser.add_argument("--lora_dropout", default=0.05, type=float)
     # Finetuning setups
+    parser.add_argument("--learning_rate", default=1e-3, type=float)
     parser.add_argument("--gradient_accumulation_steps", default=2, type=int)
     parser.add_argument("--train_batch_size", default=64, type=int)
     parser.add_argument("--eval_batch_size", default=32, type=int)
     parser.add_argument("--fp16", default=True, type=bool)
-
+    parser.add_argument("--kbit_training", default=False, action="store_true")
     parser.add_argument("--warmup_steps", default=500, type=int)
     parser.add_argument("--max_steps", default=20000, type=int)
     parser.add_argument("--save_steps", default=1000, type=int)
@@ -79,13 +84,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"Settings: {args}")
 
-    # Load pretrained
-    model_name_or_path = f"openai/whisper-{args.model_id}"
+    experiment_name = f"whisper-{args.model_id}-lora-experiment"
 
-    feature_extractor = WhisperFeatureExtractor.from_pretrained(
-        model_name_or_path)
-    tokenizer = WhisperTokenizer.from_pretrained(
-        model_name_or_path, language=args.language, task=args.task)
+    # Load pretrained processor
+    model_name_or_path = f"openai/whisper-{args.model_id}"
     processor = WhisperProcessor.from_pretrained(
         model_name_or_path, language=args.language, task=args.task)
 
@@ -105,26 +107,26 @@ if __name__ == "__main__":
     # TODO 8-bit training and inference very slow
     model = WhisperForConditionalGeneration.from_pretrained(
         model_name_or_path,
-        load_in_8bit=True,
-        device_map="auto",
+        load_in_8bit=args.kbit_training,
+        device_map=args.device,
     )
     model.config.forced_decoder_ids = None
     model.config.suppress_tokens = []
-    model = prepare_model_for_kbit_training(model)
+    if args.kbit_training:
+        model = prepare_model_for_kbit_training(model)
+        args.fp16 = False
 
-    config = LoraConfig(r=32, lora_alpha=64, target_modules=[
-                        "q_proj", "v_proj"], lora_dropout=0.05, bias="none")
+    config = LoraConfig(r=args.r, lora_alpha=args.lora_alpha,
+                        target_modules=["q_proj", "v_proj"], lora_dropout=args.lora_dropout, bias="none")
     model = get_peft_model(model, config)
     model.print_trainable_parameters()
-
-    experiment_name = f"whisper-{args.model_id}-lora-experiment"
 
     training_args = Seq2SeqTrainingArguments(
         output_dir="./logs/" + experiment_name,  # change to a repo name of your choice
         per_device_train_batch_size=args.train_batch_size,
         # increase by 2x for every 2x decrease in batch size
         gradient_accumulation_steps=args.gradient_accumulation_steps,
-        learning_rate=1e-3,
+        learning_rate=args.learning_rate,
         warmup_steps=args.warmup_steps,
         max_steps=args.max_steps,
         evaluation_strategy="steps",

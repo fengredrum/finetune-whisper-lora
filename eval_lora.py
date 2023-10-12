@@ -4,7 +4,7 @@ import evaluate
 import argparse
 import gc
 
-from transformers import WhisperProcessor, WhisperTokenizer, WhisperForConditionalGeneration
+from transformers import WhisperProcessor, WhisperForConditionalGeneration
 from peft import PeftModel, PeftConfig
 from torch.utils.data import DataLoader
 from dataclasses import dataclass
@@ -65,6 +65,7 @@ if __name__ == "__main__":
     parser.add_argument("--language", default="zh")
     parser.add_argument("--batch_size", default=64, type=int)
     parser.add_argument("--max_new_tokens", default=255, type=int)
+    parser.add_argument("--kbit_infer", default=False, action="store_true")
     parser.add_argument("--metric", default="cer")
     parser.add_argument("--device", default="cuda")
     # Dataset setups
@@ -77,12 +78,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"Settings: {args}")
 
+    # Load pretrained
     peft_config = PeftConfig.from_pretrained(args.peft_model_id)
-    tokenizer = WhisperTokenizer.from_pretrained(
-        peft_config.base_model_name_or_path, task=args.task, language=args.language)
     processor = WhisperProcessor.from_pretrained(
         peft_config.base_model_name_or_path, task=args.task, language=args.language)
-    feature_extractor = processor.feature_extractor
     forced_decoder_ids = processor.get_decoder_prompt_ids(
         language=args.language, task=args.task)
 
@@ -103,7 +102,10 @@ if __name__ == "__main__":
 
     # TODO 8-bit training and inference very slow
     model = WhisperForConditionalGeneration.from_pretrained(
-        peft_config.base_model_name_or_path, load_in_8bit=True, device_map="auto")
+        peft_config.base_model_name_or_path,
+        load_in_8bit=args.kbit_infer,
+        device_map="auto",
+    )
     model = PeftModel.from_pretrained(model, args.peft_model_id)
     model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
         language=args.language, task=args.task)
@@ -123,10 +125,10 @@ if __name__ == "__main__":
                 )
                 labels = batch["labels"].cpu().numpy()
                 labels = np.where(labels != -100, labels,
-                                  tokenizer.pad_token_id)
-                decoded_preds = tokenizer.batch_decode(
+                                  processor.tokenizer.pad_token_id)
+                decoded_preds = processor.tokenizer.batch_decode(
                     generated_tokens, skip_special_tokens=True)
-                decoded_labels = tokenizer.batch_decode(
+                decoded_labels = processor.tokenizer.batch_decode(
                     labels, skip_special_tokens=True)
                 metric.add_batch(
                     predictions=decoded_preds,
