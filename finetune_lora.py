@@ -133,6 +133,7 @@ if __name__ == "__main__":
         # gradient_checkpointing=True,
         # optim="adamw_torch",
         fp16=args.fp16,
+        dataloader_num_workers=16,
         per_device_eval_batch_size=args.eval_batch_size,
         generation_max_length=args.max_new_tokens,
         save_steps=args.save_steps,
