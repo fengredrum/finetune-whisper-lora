@@ -1,0 +1,8 @@
+jtype: WhisperExecutor
+py_modules:
+  - executor.py
+metas:
+  name: WhisperExecutor
+  description: 
+  url: 
+  keywords: ['']
